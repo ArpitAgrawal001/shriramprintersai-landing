@@ -1,38 +1,62 @@
-import express from 'express';
-import EarlyAccess from '../models/EarlyAccess.js';
+import express from "express";
+import EarlyAccess from "../models/EarlyAccess.js";
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
-  console.log("🚀 POST /api/early-access HIT");
-  console.log("📩 Request Body:", req.body);
+// Validation helper
+function isValidEmail(email) {
+  return /\S+@\S+\.\S+/.test(email);
+}
 
-  const { name, email, source } = req.body;
-
-  if (!email) {
-    console.log("❌ Missing email");
-    return res.status(400).json({ error: "Email is required" });
-  }
-
+router.post("/", async (req, res) => {
   try {
-    console.log("🔍 Checking existing email...");
-    const existing = await EarlyAccess.findOne({ email });
-    console.log("Existing Result:", existing);
+    const { name, email, organization, source } = req.body;
 
-    if (existing) {
-      console.log("⚠️ Already registered");
-      return res.status(200).json({ message: "Already registered" });
+    // 1️⃣ Validate input
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and Email are required",
+      });
     }
 
-    console.log("🆕 Creating new entry...");
-    const newEntry = await EarlyAccess.create({ name, email, source });
-    console.log("✅ Created new entry:", newEntry);
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+      });
+    }
 
-    return res.status(201).json({ message: "Successfully registered", data: newEntry });
+    // 2️⃣ Check duplicate email
+    const existing = await EarlyAccess.findOne({ email });
+
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
+
+    // 3️⃣ Save user
+    const entry = await EarlyAccess.create({
+      name,
+      email,
+      organization: organization || "",
+      source: source || "unknown",
+    });
+
+    return res.json({
+      success: true,
+      message: "Early access registered",
+      data: entry,
+    });
 
   } catch (err) {
-    console.error("🔥 ERROR IN ROUTE:", err);
-    return res.status(500).json({ error: "Server error", details: err.message });
+    console.error("❌ Server Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
